@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>مترجم النصوص</title>
+<style>
+:root{--bg:#f6f4ef;--card:#fff;--ink:#1d2433;--mute:#6b7385;--line:#e2ded3;--acc:#0f766e;--acc-ink:#fff;--err:#b42318;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161d;--card:#1b212b;--ink:#eef0f4;--mute:#98a1b3;--line:#2a3240;--acc:#2dd4bf;--acc-ink:#04201c;--err:#f97066}}
+:root[data-theme="dark"]{--bg:#12161d;--card:#1b212b;--ink:#eef0f4;--mute:#98a1b3;--line:#2a3240;--acc:#2dd4bf;--acc-ink:#04201c;--err:#f97066}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",Tahoma,"Noto Naskh Arabic",system-ui,sans-serif;line-height:1.6}
+main{max-width:980px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:1.6rem;margin:8px 0 2px}
+p.sub{margin:0 0 18px;color:var(--mute)}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+select,button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px;cursor:pointer}
+select{flex:1;min-width:130px}
+button:hover{border-color:var(--acc)}
+button.primary{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:600;padding:10px 22px}
+button:disabled{opacity:.5;cursor:not-allowed}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:720px){.grid{grid-template-columns:1fr}}
+.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;min-height:260px}
+textarea,.out{flex:1;width:100%;min-height:200px;border:0;outline:0;resize:vertical;background:transparent;color:var(--ink);font:inherit;font-size:1.05rem}
+.out{white-space:pre-wrap;overflow:auto}
+.out.ph{color:var(--mute)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--mute);font-size:.85rem;margin-top:8px;flex-wrap:wrap}
+.foot .act{display:flex;gap:6px}
+.foot button{padding:5px 10px;font-size:.85rem}
+.msg{margin-top:12px;color:var(--err);min-height:1.4em}
+.drop{border:1.5px dashed var(--line);border-radius:12px;padding:10px 14px;color:var(--mute);font-size:.9rem;margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<main>
+<h1>مترجم النصوص</h1>
+<p class="sub">اكتب نصاً أو ارفع ملفاً، اختر اللغة، واحصل على الترجمة فوراً.</p>
+
+<div class="bar">
+<select id="src" aria-label="لغة المصدر"></select>
+<button id="swap" title="تبديل اللغتين" aria-label="تبديل اللغتين">⇄</button>
+<select id="dst" aria-label="لغة الهدف"></select>
+<button id="go" class="primary">ترجم</button>
+</div>
+
+<div class="grid">
+<section class="box">
+<textarea id="in" placeholder="أدخل النص هنا…" maxlength="20000"></textarea>
+<div class="foot"><span id="cnt">0 / 20000</span>
+<div class="act"><button id="clr">مسح</button></div></div>
+</section>
+<section class="box">
+<div id="out" class="out ph" aria-live="polite">ستظهر الترجمة هنا</div>
+<div class="foot"><span id="st"></span>
+<div class="act"><button id="cp" disabled>نسخ</button><button id="dl" disabled>تحميل .txt</button></div></div>
+</section>
+</div>
+
+<div class="drop">
+<span>رفع ملف نصي (.txt .md .srt .csv):</span>
+<input type="file" id="file" accept=".txt,.md,.srt,.csv,.json,text/plain">
+</div>
+<div class="msg" id="msg" role="alert"></div>
+</main>
+
+<script>
+const L={auto:"كشف تلقائي",ar:"العربية",fr:"Français",en:"English",es:"Español",de:"Deutsch",it:"Italiano",pt:"Português",tr:"Türkçe",ru:"Русский",zh:"中文",ja:"日本語",ko:"한국어",hi:"हिन्दी"};
+const $=id=>document.getElementById(id);
+const src=$("src"),dst=$("dst"),inp=$("in"),out=$("out"),msg=$("msg");
+for(const k in L){src.add(new Option(L[k],k));if(k!=="auto")dst.add(new Option(L[k],k))}
+src.value="auto";dst.value="en";
+let result="",fname="translation";
+
+inp.addEventListener("input",()=>{$("cnt").textContent=inp.value.length+" / 20000"});
+$("clr").onclick=()=>{inp.value="";inp.dispatchEvent(new Event("input"));setOut("")};
+$("swap").onclick=()=>{
+  if(src.value==="auto")return;
+  const s=src.value;src.value=dst.value;dst.value=s;
+  if(result){inp.value=result;inp.dispatchEvent(new Event("input"));setOut("")}
+};
+function setOut(t){
+  result=t;
+  out.textContent=t||"ستظهر الترجمة هنا";
+  out.classList.toggle("ph",!t);
+  $("cp").disabled=$("dl").disabled=!t;
+}
+$("file").onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  if(f.size>200000){msg.textContent="الملف كبير جداً (الحد 200 كيلوبايت).";return}
+  fname=f.name.replace(/\.[^.]+$/,"")||"translation";
+  const r=new FileReader();
+  r.onload=()=>{inp.value=String(r.result).slice(0,20000);inp.dispatchEvent(new Event("input"));msg.textContent=""};
+  r.onerror=()=>{msg.textContent="تعذّرت قراءة الملف."};
+  r.readAsText(f,"utf-8");
+};
+$("cp").onclick=async()=>{
+  try{await navigator.clipboard.writeText(result);$("st").textContent="تم النسخ ✓"}
+  catch(e){$("st").textContent="تعذّر النسخ، حدّد النص يدوياً"}
+};
+$("dl").onclick=()=>{
+  const u=URL.createObjectURL(new Blob([result],{type:"text/plain;charset=utf-8"}));
+  const a=document.createElement("a");a.href=u;a.download=fname+"."+dst.value+".txt";
+  document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(u);
+};
+const code=c=>c==="zh"?"zh-CN":c;
+function chunks(line){
+  const parts=line.match(/[^.!?؟។。]+[.!?؟។。]*\s*/g)||[line],res=[];let cur="";
+  for(let p of parts){
+    while(p.length>450){if(cur){res.push(cur);cur=""}res.push(p.slice(0,450));p=p.slice(450)}
+    if((cur+p).length>450){res.push(cur);cur=p}else cur+=p;
+  }
+  if(cur)res.push(cur);return res;
+}
+async function tr(q,from,to){
+  const url="https://api.mymemory.translated.net/get?q="+encodeURIComponent(q)+"&langpair="+encodeURIComponent(from+"|"+to);
+  const r=await fetch(url);if(!r.ok)throw new Error("http");
+  const j=await r.json();const t=j.responseData&&j.responseData.translatedText;
+  if(j.responseStatus!==200||!t||/MYMEMORY WARNING/i.test(t))throw new Error("quota");
+  return t;
+}
+$("go").onclick=async()=>{
+  const text=inp.value.trim();msg.textContent="";
+  if(!text){msg.textContent="أدخل نصاً أولاً.";return}
+  if(src.value===dst.value){msg.textContent="اختر لغتين مختلفتين.";return}
+  $("go").disabled=true;$("st").textContent="جارٍ الترجمة…";
+  const from=src.value==="auto"?"Autodetect":code(src.value),to=code(dst.value);
+  try{
+    const lines=text.split("\n"),outl=[];
+    for(const line of lines){
+      if(!line.trim()){outl.push("");continue}
+      let o="";
+      for(const c of chunks(line)){o+=await tr(c,from,to)+" "}
+      outl.push(o.trim());setOut(outl.join("\n"));
+    }
+    setOut(outl.join("\n"));$("st").textContent="تمت الترجمة ✓";
+  }catch(e){
+    msg.textContent=e.message==="quota"?"انتهى الحد المجاني اليومي للخدمة، حاول غداً.":"تعذّر الاتصال بخدمة الترجمة. تحقق من الإنترنت.";
+    $("st").textContent="";
+  }finally{$("go").disabled=false}
+};
+</script>
+</body>
+</html>
